@@ -36,6 +36,17 @@ func LoadEnv() {
 		os.Exit(0)
 	}
 
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("LOG_LEVEL"))) {
+	case "", "info":
+		logLevel = LogLevelInfo
+	case "warn":
+		logLevel = LogLevelWarn
+	case "error":
+		logLevel = LogLevelError
+	default:
+		FatalLog("invalid LOG_LEVEL: expected info, warn or error")
+	}
+
 	if os.Getenv("SESSION_SECRET") != "" {
 		ss := os.Getenv("SESSION_SECRET")
 		if ss == "random_string" {

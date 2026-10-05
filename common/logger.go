@@ -13,6 +13,14 @@ import (
 	"time"
 )
 
+type LogLevel int
+
+const (
+	LogLevelInfo LogLevel = iota
+	LogLevelWarn
+	LogLevelError
+)
+
 const (
 	loggerINFO  = "INFO"
 	loggerWarn  = "WARN"
@@ -21,6 +29,7 @@ const (
 
 const maxLogCount = 1000000
 
+var logLevel = LogLevelInfo
 var logCount int
 var setupLogLock sync.Mutex
 var setupLogWorking bool
@@ -44,9 +53,19 @@ func SetupLogger() {
 		gin.DefaultWriter = io.MultiWriter(os.Stdout, fd)
 		gin.DefaultErrorWriter = io.MultiWriter(os.Stderr, fd)
 	}
+	if !IsLogLevelEnabled(LogLevelInfo) {
+		gin.DefaultWriter = io.Discard
+	}
+}
+
+func IsLogLevelEnabled(level LogLevel) bool {
+	return level >= logLevel
 }
 
 func SysLog(s string) {
+	if !IsLogLevelEnabled(LogLevelInfo) {
+		return
+	}
 	t := time.Now()
 	_, _ = fmt.Fprintf(gin.DefaultWriter, "[SYS] %v | %s \n", t.Format("2006/01/02 - 15:04:05"), s)
 }
@@ -57,25 +76,33 @@ func SysError(s string) {
 }
 
 func LogInfo(ctx context.Context, msg string) {
-	logHelper(ctx, loggerINFO, msg)
+	logHelper(ctx, LogLevelInfo, msg)
 }
 
 func LogWarn(ctx context.Context, msg string) {
-	logHelper(ctx, loggerWarn, msg)
+	logHelper(ctx, LogLevelWarn, msg)
 }
 
 func LogError(ctx context.Context, msg string) {
-	logHelper(ctx, loggerError, msg)
+	logHelper(ctx, LogLevelError, msg)
 }
 
-func logHelper(ctx context.Context, level string, msg string) {
+func logHelper(ctx context.Context, level LogLevel, msg string) {
+	if !IsLogLevelEnabled(level) {
+		return
+	}
 	writer := gin.DefaultErrorWriter
-	if level == loggerINFO {
+	levelName := loggerError
+	switch level {
+	case LogLevelInfo:
 		writer = gin.DefaultWriter
+		levelName = loggerINFO
+	case LogLevelWarn:
+		levelName = loggerWarn
 	}
 	id := ctx.Value(RequestIdKey)
 	now := time.Now()
-	_, _ = fmt.Fprintf(writer, "[%s] %v | %s | %s \n", level, now.Format("2006/01/02 - 15:04:05"), id, msg)
+	_, _ = fmt.Fprintf(writer, "[%s] %v | %s | %s \n", levelName, now.Format("2006/01/02 - 15:04:05"), id, msg)
 	logCount++ // we don't need accurate count, so no lock here
 	if logCount > maxLogCount && !setupLogWorking {
 		logCount = 0

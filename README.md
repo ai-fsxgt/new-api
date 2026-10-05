@@ -73,6 +73,7 @@ services:
       - REDIS_CONN_STRING=redis://redis
       - SESSION_SECRET=b2cDFetMKbWqR3fc  # 修改为随机字符串
       - TZ=Asia/Shanghai
+      - LOG_LEVEL=warn
       - STREAMING_TIMEOUT=300
       - GENERATE_DEFAULT_TOKEN=true
       - UPDATE_TASK=false
@@ -96,6 +97,13 @@ services:
     container_name: redis
     restart: always
 ```
+
+`LOG_LEVEL` 控制项目公共日志和 Gin 请求日志，支持 `info`（默认）、`warn`、`error`。
+请求日志按状态码分级：小于 400 为 INFO，4xx 为 WARN，5xx 为 ERROR。
+设置 `LOG_LEVEL=warn` 后，正常请求和 INFO 日志不再输出，保留警告、错误及致命错误；过滤同时作用于控制台和日志文件。
+直接使用 `log.Printf`、`fmt.Println` 等输出的日志不受此配置控制。
+
+部署时需要使用包含此修改的镜像。修改 Compose 环境变量后，执行 `docker compose up -d --force-recreate new-api` 重新创建容器；`docker compose restart` 不会应用环境变量变更。
 
 ## 📦 发布 Release
 

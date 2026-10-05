@@ -33,13 +33,13 @@ var indexPage []byte
 
 func main() {
 	err := godotenv.Load(".env")
+	common.LoadEnv()
+	common.SetupLogger()
+
 	if err != nil {
 		common.SysLog("Support for .env file is disabled")
 	}
 
-	common.LoadEnv()
-
-	common.SetupLogger()
 	common.SysLog("New API " + common.Version + " started")
 	if os.Getenv("GIN_MODE") != "debug" {
 		gin.SetMode(gin.ReleaseMode)
@@ -82,7 +82,7 @@ func main() {
 	}
 	if common.MemoryCacheEnabled {
 		common.SysLog("memory cache enabled")
-		common.SysError(fmt.Sprintf("sync frequency: %d seconds", common.SyncFrequency))
+		common.SysLog(fmt.Sprintf("sync frequency: %d seconds", common.SyncFrequency))
 		model.InitChannelCache()
 	}
 	if common.MemoryCacheEnabled {
