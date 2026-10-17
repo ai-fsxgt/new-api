@@ -126,7 +126,7 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *rel
 	req.Set("X-Stainless-Runtime", "node")
 	req.Set("x-stainless-helper-method", "stream")
 	req.Set("x-app", "cli")
-	req.Set("User-Agent", "claude-cli/2.1.68 (external, cli)")
+	req.Set("User-Agent", "claude-cli/2.1.300 (external, cli)")
 	// interleaved-thinking 会引入 thinking signature 校验。
 	// OpenAI 兼容模式下我们无法可靠透传 thinking block/signature，因此默认禁用；
 	// 仅在 Claude /v1/messages 原生请求时开启，保持与 Claude Code CLI 行为一致。
