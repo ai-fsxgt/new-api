@@ -4,9 +4,38 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"one-api/dto"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
+
+var upstreamContextLimitPattern = regexp.MustCompile(`accepts at most (\d+) combined input and output tokens\. However, your request has (\d+) input tokens and asks for (\d+) output tokens`)
+
+// 改写为 Anthropic 官方超限文案，客户端据此自动调小 max_tokens 或压缩重试；属于请求问题，不应重试或禁用渠道。
+func NormalizeClaudeContextLimitError(openaiErr *dto.OpenAIErrorWithStatusCode) {
+	matches := upstreamContextLimitPattern.FindStringSubmatch(openaiErr.Error.Message)
+	if matches == nil {
+		return
+	}
+	limit, _ := strconv.Atoi(matches[1])
+	inputTokens, _ := strconv.Atoi(matches[2])
+	outputTokens, _ := strconv.Atoi(matches[3])
+
+	if inputTokens >= limit {
+		openaiErr.Error.Message = fmt.Sprintf("prompt is too long: %d tokens > %d maximum", inputTokens, limit)
+	} else {
+		openaiErr.Error.Message = fmt.Sprintf(
+			"input length and `max_tokens` exceed context limit: %d + %d > %d, decrease input length or `max_tokens` and try again",
+			inputTokens, outputTokens, limit,
+		)
+	}
+	openaiErr.Error.Type = "invalid_request_error"
+	openaiErr.StatusCode = http.StatusBadRequest
+	openaiErr.LocalError = true
+}
 
 // AugmentUsageLimitReachedMessage extracts optional reset metadata from upstream error bodies and
 // appends it to the message for easier debugging.

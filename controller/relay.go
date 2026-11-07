@@ -257,6 +257,9 @@ func relayRequest(c *gin.Context, relayMode int, channel *model.Channel) *dto.Op
 	requestBody, _ := common.GetRequestBody(c)
 	c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 	openaiErr := relayHandler(c, relayMode)
+	if openaiErr != nil && relayMode == relayconstant.RelayModeClaudeMessages {
+		relay.NormalizeClaudeContextLimitError(openaiErr)
+	}
 	recordChannelRequest(channel.Id, openaiErr)
 	return openaiErr
 }
