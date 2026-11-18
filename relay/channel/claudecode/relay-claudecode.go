@@ -22,6 +22,48 @@ import (
 var claudeToolUseIDRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 var claudeToolUseInvalidCharRegex = regexp.MustCompile(`[^a-zA-Z0-9_-]+`)
 
+// 这些模型传非默认的 temperature/top_p/top_k 或 budget_tokens 思考预算会返回 400。
+var fixedSamplingModelPrefixes = []string{
+	"claude-opus-4-7",
+	"claude-opus-4-8",
+	"claude-opus-5",
+	"claude-sonnet-5",
+	"claude-haiku-5",
+	"claude-fable-",
+	"claude-mythos-",
+}
+
+func isFixedSamplingModel(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	for _, prefix := range fixedSamplingModelPrefixes {
+		if strings.HasPrefix(model, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func RemoveUnsupportedModelParams(bodyMap map[string]json.RawMessage, model string) {
+	if !isFixedSamplingModel(model) {
+		return
+	}
+	delete(bodyMap, "temperature")
+	delete(bodyMap, "top_p")
+	delete(bodyMap, "top_k")
+
+	var thinking map[string]any
+	if json.Unmarshal(bodyMap["thinking"], &thinking) != nil || thinking["type"] != "enabled" {
+		return
+	}
+	thinking["type"] = "adaptive"
+	delete(thinking, "budget_tokens")
+	patched, err := json.Marshal(thinking)
+	if err != nil {
+		return
+	}
+	bodyMap["thinking"] = patched
+}
+
 func generateClaudeCodeUserID(apiKey string) string {
 	hash := sha256.Sum256([]byte(apiKey))
 	return fmt.Sprintf(`{"device_id":"%x","account_uuid":"","session_id":"%s"}`, hash, uuid.New().String())
@@ -170,6 +212,11 @@ func RequestOpenAI2ClaudeMessage(textRequest dto.GeneralOpenAIRequest, info *rel
 	}
 	if claudeRequest.MaxTokens == 0 {
 		claudeRequest.MaxTokens = 64000
+	}
+	if isFixedSamplingModel(claudeRequest.Model) {
+		claudeRequest.Temperature = nil
+		claudeRequest.TopP = 0
+		claudeRequest.TopK = 0
 	}
 	if textRequest.Stop != nil {
 		// stop maybe string/array string, convert to array string

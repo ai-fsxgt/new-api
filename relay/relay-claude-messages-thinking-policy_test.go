@@ -246,3 +246,24 @@ func jsonContains(raw, needle string) bool {
 	compact, _ := json.Marshal(v)
 	return strings.Contains(string(compact), needle)
 }
+
+func TestNativePrepareRequestKeepsParamsInDeepSeekV4Compatibility(t *testing.T) {
+	info := &relaycommon.RelayInfo{
+		ChannelSetting: map[string]any{"compatibility_mode": claudeCodeDeepSeekV4CompatibilityMode},
+	}
+	req := &claudecode.ClaudeRequest{Model: "claude-haiku-5-5"}
+	bodyMap := map[string]json.RawMessage{
+		"temperature": json.RawMessage(`0.2`),
+		"thinking":    json.RawMessage(`{"type":"enabled"}`),
+	}
+
+	prepared, err := (&nativeClaudeMessagesAdapter{}).PrepareRequest(nil, info, req, bodyMap)
+	if err != nil {
+		t.Fatalf("PrepareRequest error: %v", err)
+	}
+
+	got := string(prepared.Payload)
+	if !jsonContains(got, `"temperature":0.2`) || !jsonContains(got, `"thinking":{"type":"enabled"}`) {
+		t.Fatalf("expected params to be kept, got %s", got)
+	}
+}
