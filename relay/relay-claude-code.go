@@ -3,6 +3,7 @@ package relay
 import (
 	"bytes"
 	"crypto/sha1"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"one-api/common"
@@ -465,8 +466,14 @@ func applyClaudeCodeSystemRules(c *gin.Context, claudeReq *claudecode.ClaudeRequ
 	return patched, true, false
 }
 
+// Claude signatures are standard base64; other providers send empty, UUID or placeholder values.
 func isLikelyClaudeThinkingSignature(signature string) bool {
-	return strings.HasPrefix(strings.TrimSpace(signature), "ErUB")
+	signature = strings.TrimSpace(signature)
+	if signature == "" {
+		return false
+	}
+	_, err := base64.StdEncoding.DecodeString(signature)
+	return err == nil
 }
 
 func extractThinkingText(block map[string]any) string {
